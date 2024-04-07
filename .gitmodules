@@ -1,4 +1,4 @@
 [submodule "hf_transformers"]
 	path = hf_transformers
-	url = https://github.com/huggingface/transformers.git
+	url = https://github.com/KylekG/transformers.git
 	branch = mamba_backport
