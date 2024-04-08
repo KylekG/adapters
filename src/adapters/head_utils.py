@@ -146,6 +146,31 @@ STATIC_TO_FLEX_HEAD_MAP = {
             "lm_head.decoder",
         ],
     },
+    # Mamba
+    "MambaForCausalLM": {
+        "config": {
+            "head_type": "causal_lm",
+            "layers": 1,
+            "activation_function": "gelu",
+            "layer_norm": True,
+            "bias": True
+        },
+        "layers": [
+            "lm_head"
+        ]
+    },
+    "MambaForSequenceClassification": {
+        "config": {
+            "head_type": "classification",
+            "layers": 1,
+            "activation_function": "gelu",
+            "layer_norm": True,
+            "bias": True
+        },
+        "layers": [
+            None, "classifier"
+        ]
+    },
     # RoBERTa
     "RobertaForSequenceClassification": {
         "config": {
@@ -752,8 +777,11 @@ def get_head_config_and_rename_list(model_class_name, head_name, label2id, num_l
     for name in data["layers"]:
         if name is not None:
             escaped_name = re.escape(name)
-            rename_list.append((rf"{escaped_name}\.(\S+)", f"heads.{head_name}.{i}.{{0}}"))
+            rename_list.append(
+                (rf"{escaped_name}\.(\S+)", f"heads.{head_name}.{i}.{{0}}"))
         i += 1
-    rename_func = lambda k, rename_list=rename_list: _regex_list_rename_func(k, rename_list)
+
+    def rename_func(k, rename_list=rename_list): return _regex_list_rename_func(
+        k, rename_list)
 
     return config, rename_func

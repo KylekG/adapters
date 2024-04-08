@@ -22,6 +22,7 @@ ADAPTER_MODEL_MAPPING_NAMES = OrderedDict(
         ("gpt2", "GPT2AdapterModel"),
         ("gptj", "GPTJAdapterModel"),
         ("llama", "LlamaAdapterModel"),
+        ("mamba", "MambaAdapterModel"),
         ("mbart", "MBartAdapterModel"),
         ("mt5", "MT5AdapterModel"),
         ("roberta", "RobertaAdapterModel"),
@@ -33,11 +34,13 @@ ADAPTER_MODEL_MAPPING_NAMES = OrderedDict(
 )
 
 
-ADAPTER_MODEL_MAPPING = _LazyAdapterModelAutoMapping(CONFIG_MAPPING_NAMES, ADAPTER_MODEL_MAPPING_NAMES)
+ADAPTER_MODEL_MAPPING = _LazyAdapterModelAutoMapping(
+    CONFIG_MAPPING_NAMES, ADAPTER_MODEL_MAPPING_NAMES)
 
 
 class AutoAdapterModel(_BaseAutoModelClass):
     _model_mapping = ADAPTER_MODEL_MAPPING
 
 
-AutoAdapterModel = auto_class_update(AutoAdapterModel, head_doc="adapters and flexible heads")
+AutoAdapterModel = auto_class_update(
+    AutoAdapterModel, head_doc="adapters and flexible heads")

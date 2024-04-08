@@ -40,6 +40,7 @@ CONFIG_CLASS_KEYS_MAPPING = {
         "hidden_dropout_prob": "resid_pdrop",
         "attention_probs_dropout_prob": "attn_pdrop",
     },
+    "mamba": {},
     "mbart": {
         "num_attention_heads": "encoder_attention_heads",
         "hidden_size": "d_model",
@@ -57,7 +58,8 @@ CONFIG_CLASS_KEYS_MAPPING = {
     "vit": {},
     "xlm_roberta": {},
 }
-SUBMODEL_NAMES = {"clip": ["vision_config", "text_config"], "encoder-decoder": ["encoder", "decoder"]}
+SUBMODEL_NAMES = {"clip": ["vision_config", "text_config"],
+                  "encoder-decoder": ["encoder", "decoder"]}
 
 
 def init_adapters_config(
@@ -87,7 +89,8 @@ def init_adapters_config(
     fusion_models = getattr(model_config, "adapter_fusion_models", [])
     fusion_config = getattr(model_config, "adapter_fusion", None)
     for fusion_adapter_names in fusion_models:
-        model.adapters_config.add_fusion(fusion_adapter_names, config=fusion_config)
+        model.adapters_config.add_fusion(
+            fusion_adapter_names, config=fusion_config)
 
 
 def wrap_config(config: PretrainedConfig):
