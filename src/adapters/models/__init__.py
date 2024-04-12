@@ -18,7 +18,7 @@ from .distilbert.mixin_distilbert import DistilBertModelAdaptersMixin, DistilBer
 from .gpt2.mixin_gpt2 import GPT2ModelAdapterMixin
 from .gptj.mixin_gptj import GPTJMLPAdaptersMixin, GPTJModelAdapterMixin
 from .llama.mixin_llama import LlamaForQuestionAnsweringAdapterMixin, LlamaModelAdapterMixin
-from .mamba.mixin_mamba import MambaMixerAdapterMixin, MambaModelAdapterMixin, MambaBlockAdapterMixin
+from .mamba.mixin_mamba import MambaModelAdapterMixin
 from .t5.mixin_t5 import (
     T5BlockAdaptersMixin,
     T5ForCondiditionalGenerationWithHeadsMixin,
@@ -52,8 +52,6 @@ MODEL_MIXIN_MAPPING = {
     "CLIPVisionModelWithProjection": CLIPVisionModelAdaptersMixin,
     "ElectraLayer": BertLayerAdaptersMixin,
     "ElectraModel": BertModelAdaptersMixin,
-    "MambaMixer": MambaMixerAdapterMixin,
-    "MambaBlock": MambaBlockAdapterMixin,
     "MambaModel": MambaModelAdapterMixin,
     "MBartEncoder": BartEncoderAdaptersMixin,
     "MBartDecoder": BartDecoderAdaptersMixin,

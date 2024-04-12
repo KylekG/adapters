@@ -61,7 +61,8 @@ class LoRA(nn.Module):
             nn.init.ones_(self.lora_A)
             nn.init.ones_(self.lora_B)
         else:
-            raise ValueError("Unknown init_weights type: {}".format(config.init_weights))
+            raise ValueError(
+                "Unknown init_weights type: {}".format(config.init_weights))
 
         if self.use_gating:
             self.gate = nn.Linear(lora_A_shape[-1], gating_heads)
@@ -84,7 +85,8 @@ class LoRA(nn.Module):
     def forward(self, hidden_states: Optional[torch.Tensor], layer_input: torch.Tensor):
         if hidden_states is None:
             hidden_states = layer_input
-        hidden_states = self.lora_dropout(hidden_states) @ torch.t(self.lora_A) @ torch.t(self.lora_B)
+        hidden_states = self.lora_dropout(
+            hidden_states) @ torch.t(self.lora_A) @ torch.t(self.lora_B)
         if self.use_gating:
             gate = torch.sigmoid(self.gate(layer_input))
             gate = torch.mean(gate, dim=1).unsqueeze(-1)
@@ -106,7 +108,8 @@ class IA3(nn.Module):
         super().__init__()
         assert config.composition_mode == "scale", "IA3 module only supports composition_mode='scale'."
         if config.r > 1:
-            raise ValueError("Can only use composition_mode='scale' when r == 1.")
+            raise ValueError(
+                "Can only use composition_mode='scale' when r == 1.")
         self.r = config.r
         self.lora_alpha = config.alpha
         self.composition_mode = config.composition_mode
@@ -123,14 +126,16 @@ class IA3(nn.Module):
         # For compatibility with LoRA, allow all init_weights types here.
         # Usually should be "ia3".
         if config.init_weights == "lora":
-            logger.warning("(IA)^3 module initialized with LoRA zeo init. Ignore if this is intended.")
+            logger.warning(
+                "(IA)^3 module initialized with LoRA zeo init. Ignore if this is intended.")
             nn.init.zeros_(self.lora_B)
         elif config.init_weights == "bert":
             nn.init.normal_(self.lora_B, std=0.02)
         elif config.init_weights == "ia3":
             nn.init.ones_(self.lora_B)
         else:
-            raise ValueError("Unknown init_weights type: {}".format(config.init_weights))
+            raise ValueError(
+                "Unknown init_weights type: {}".format(config.init_weights))
 
         if self.use_gating:
             self.gate = nn.Linear(lora_A_shape[-1], gating_heads)
@@ -151,7 +156,8 @@ class IA3(nn.Module):
         return weights / (added * self.scaling)
 
     def forward(self, hidden_states: Optional[torch.Tensor], layer_input: torch.Tensor):
-        scaling_vector = self.lora_B.view(1, 1, -1).repeat(layer_input.shape[0], 1, 1)
+        scaling_vector = self.lora_B.view(
+            1, 1, -1).repeat(layer_input.shape[0], 1, 1)
         if hidden_states is None:
             hidden_states = scaling_vector
         else:
@@ -203,7 +209,8 @@ class LoRALayer(AdapterLayerBase):
             elif lora_config.composition_mode == "scale":
                 lora_cls = IA3
             else:
-                raise ValueError(f"Unknown composition_mode: {lora_config.composition_mode}")
+                raise ValueError(f"Unknown composition_mode: {
+                                 lora_config.composition_mode}")
             lora = lora_cls(
                 *self._get_lora_shapes(lora_config),
                 lora_config,
@@ -229,7 +236,8 @@ class LoRALayer(AdapterLayerBase):
                         else:
                             avg_state_dict[k] = weight * v
                 else:
-                    self.delete_adapter(adapter_name)  # clean up before raising error
+                    # clean up before raising error
+                    self.delete_adapter(adapter_name)
                     raise ValueError("Adapter {} not found.".format(name))
             # load averaged weights
             self.loras[adapter_name].load_state_dict(avg_state_dict)
@@ -311,7 +319,8 @@ class LoRALinear(LoRALayer, ComposableAdapterLayerBase, nn.Linear):
     ):
         if no_init_bias and "bias" not in kwargs:
             kwargs["bias"] = False
-        LoRALayer.__init__(self, location_key, model_config, adapters_config, in_features, out_features, **kwargs)
+        LoRALayer.__init__(self, location_key, model_config,
+                           adapters_config, in_features, out_features, **kwargs)
 
         self.attn_key = attn_key
         self.fan_in_fan_out = fan_in_fan_out
@@ -343,7 +352,8 @@ class LoRALinear(LoRALayer, ComposableAdapterLayerBase, nn.Linear):
         else:
             # Make sure that the bias is not added if the original module does not have one
             if "bias" not in kwargs:
-                kwargs["bias"] = hasattr(module, "bias") and module.bias is not None
+                kwargs["bias"] = hasattr(
+                    module, "bias") and module.bias is not None
             new_module = cls(
                 module.in_features,
                 module.out_features,
@@ -354,7 +364,7 @@ class LoRALinear(LoRALayer, ComposableAdapterLayerBase, nn.Linear):
                 **kwargs,
             )
         new_module.weight.data = module.weight.data
-        if module.bias is not None:
+        if kwargs["bias"]:
             new_module.bias.data = module.bias.data
 
         return new_module
@@ -388,7 +398,8 @@ class LoRALinear(LoRALayer, ComposableAdapterLayerBase, nn.Linear):
                 self.weight.data = lora.com(self.weight.data, delta_w)
                 self.merged = name
             elif self.merged != name:
-                raise ValueError("LoRALayer already has a merged LoRA module. Please reset it first.")
+                raise ValueError(
+                    "LoRALayer already has a merged LoRA module. Please reset it first.")
 
     def vslice(self, state: LoRAState, slice_obj: slice) -> LoRAState:
         return LoRAState(
@@ -400,21 +411,24 @@ class LoRALinear(LoRALayer, ComposableAdapterLayerBase, nn.Linear):
     def pad_and_concat(self, states: List[LoRAState]) -> LoRAState:
         return LoRAState(
             torch.cat([s.layer_input for s in states], dim=0),
-            torch.cat([s.hidden_states for s in states], dim=0) if states[0].hidden_states is not None else None,
+            torch.cat([s.hidden_states for s in states],
+                      dim=0) if states[0].hidden_states is not None else None,
             torch.cat([s.layer_output for s in states], dim=0),
         )
 
     def repeat(self, state: LoRAState, channels: int) -> LoRAState:
         return LoRAState(
             state.layer_input.repeat(channels, 1, 1),
-            state.hidden_states.repeat(channels, 1, 1) if state.hidden_states is not None else None,
+            state.hidden_states.repeat(
+                channels, 1, 1) if state.hidden_states is not None else None,
             state.layer_output.repeat(channels, 1, 1),
         )
 
     def mean(self, states: List[LoRAState], weights: torch.Tensor) -> LoRAState:
         return LoRAState(
             states[0].layer_input,
-            torch.mean(torch.stack([s.hidden_states for s in states], dim=0) * weights, dim=0)
+            torch.mean(torch.stack(
+                [s.hidden_states for s in states], dim=0) * weights, dim=0)
             if states[0].hidden_states is not None
             else None,
             states[0].layer_output,
@@ -429,7 +443,8 @@ class LoRALinear(LoRALayer, ComposableAdapterLayerBase, nn.Linear):
         return state._replace(hidden_states=hidden_states)
 
     def forward(self, input_states: torch.Tensor):
-        weight = torch.transpose(self.weight, -2, -1) if self.fan_in_fan_out else self.weight
+        weight = torch.transpose(
+            self.weight, -2, -1) if self.fan_in_fan_out else self.weight
         # result shape: <batch_size> x <seq_len> x <head_dim>
         layer_output = F.linear(input_states, weight, bias=self.bias)
 
@@ -473,7 +488,8 @@ class LoRAMergedLinear(LoRALayer, nn.Linear):
     ):
         if no_init_bias and "bias" not in kwargs:
             kwargs["bias"] = False
-        LoRALayer.__init__(self, location_key, model_config, adapters_config, in_features, out_features, **kwargs)
+        LoRALayer.__init__(self, location_key, model_config,
+                           adapters_config, in_features, out_features, **kwargs)
 
         self.fan_in_fan_out = fan_in_fan_out
         if fan_in_fan_out:
@@ -549,7 +565,8 @@ class LoRAMergedLinear(LoRALayer, nn.Linear):
                 fill_value = 1
         result = x.new_full((*x.shape[:-1], self.out_features), fill_value)
         result = result.view(-1, self.out_features)
-        result[:, lora.lora_ind] = x.reshape(-1, self.out_features // 3 * self.get_n_heads(lora))
+        result[:, lora.lora_ind] = x.reshape(
+            -1, self.out_features // 3 * self.get_n_heads(lora))
         return result.view((*x.shape[:-1], self.out_features))
 
     def reset_adapter(self):
@@ -568,7 +585,8 @@ class LoRAMergedLinear(LoRALayer, nn.Linear):
                     ).squeeze(0)
                 # shape after transpose: <head_dim> x <head_dim * n_heads>
                 delta_w = delta_w.transpose(-2, -1)
-                self.weight.data = lora.com_inv(self.weight.data, T(self.pad(delta_w, lora)))
+                self.weight.data = lora.com_inv(
+                    self.weight.data, T(self.pad(delta_w, lora)))
             self.merged = None
 
     def _compute_adapted_weight(self, name, lora):
@@ -600,7 +618,8 @@ class LoRAMergedLinear(LoRALayer, nn.Linear):
                 self.weight.data = self._compute_adapted_weight(name, lora)
                 self.merged = name
             elif self.merged != name:
-                raise ValueError("LoRALayer already has a merged LoRA module. Please reset it first.")
+                raise ValueError(
+                    "LoRALayer already has a merged LoRA module. Please reset it first.")
 
     def forward(self, x: torch.Tensor):
         def T(w):
@@ -616,7 +635,8 @@ class LoRAMergedLinear(LoRALayer, nn.Linear):
                         if lora.composition_mode == "scale":
                             delta_w = lora.lora_B.view(1, 1, -1)
                         else:
-                            after_A = F.linear(lora.lora_dropout(x), lora.lora_A)
+                            after_A = F.linear(
+                                lora.lora_dropout(x), lora.lora_A)
                             after_B = F.conv1d(
                                 after_A.transpose(-2, -1), lora.lora_B.unsqueeze(-1), groups=sum(lora.enable_lora)
                             ).transpose(-2, -1)
@@ -631,9 +651,11 @@ class LoRAMergedLinear(LoRALayer, nn.Linear):
                         else:
                             gate = None
                         # result = (batch_size, seq_len, head_dim * 3)
-                        result = lora.com(result, self.pad(delta_w, lora), scaling=gate)
+                        result = lora.com(result, self.pad(
+                            delta_w, lora), scaling=gate)
                     return result
                 else:
-                    raise ValueError(f"Invalid adapter setup. Cannot use {adapter_setup} with LoRA.")
+                    raise ValueError(f"Invalid adapter setup. Cannot use {
+                                     adapter_setup} with LoRA.")
 
         return F.linear(x, T(self.weight), bias=self.bias)

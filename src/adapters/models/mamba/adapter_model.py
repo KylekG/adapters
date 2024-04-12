@@ -5,7 +5,7 @@ from transformers.models.mamba.modeling_mamba import MAMBA_START_DOCSTRING, MAMB
 from ...context import AdapterSetup
 from ...heads import ModelWithFlexibleHeadsAdaptersMixin
 
-from ...model_mixin import EmbeddingAdaptersWrapperMixin
+from ...model_mixin import EmbeddingAdaptersWrapperMixin, ModelWithHeadsAdaptersMixin
 
 from ...wrappers import init
 
@@ -24,6 +24,7 @@ from .heads_mamba import MambaSequenceClassificationHead
 )
 class MambaAdapterModel(EmbeddingAdaptersWrapperMixin, ModelWithFlexibleHeadsAdaptersMixin, MambaPreTrainedModel):
     head_types = ["causal_lm", "classification"]
+    use_pooler = False
 
     def __init__(
         self,
@@ -63,7 +64,6 @@ class MambaAdapterModel(EmbeddingAdaptersWrapperMixin, ModelWithFlexibleHeadsAda
         inference_params=None,
         **kwargs
     ):
-
         attention_mask = attention_mask.view(
             -1, attention_mask.size(-1)) if attention_mask is not None else None
         token_type_ids = token_type_ids.view(
@@ -83,10 +83,12 @@ class MambaAdapterModel(EmbeddingAdaptersWrapperMixin, ModelWithFlexibleHeadsAda
             return_dict=return_dict,
             inference_params=inference_params,
             output_context=True,
+            output_hidden_states=output_hidden_states
         )
         # required e.g. for prompt tuning in all models
         kwargs["context"] = context
         head_inputs = outputs
+        kwargs["eos_mask"] = input_ids == self.config.eos_token_id
 
         if head or AdapterSetup.get_context_head_setup() or self.active_head:
             head_outputs = self.forward_head(
@@ -94,40 +96,43 @@ class MambaAdapterModel(EmbeddingAdaptersWrapperMixin, ModelWithFlexibleHeadsAda
                 head_name=head,
                 attention_mask=attention_mask,
                 return_dict=return_dict,
-                **kwargs,
+                get_cls_from_eos_tokens=True,
+                ** kwargs,
             )
             return head_outputs
         else:
             # in case no head is used just return the output of the base model (including pooler output)
             return outputs
 
-    def prepare_inputs_for_generation(self, input_ids, past=None, attention_mask=None, **model_kwargs):
+    def prepare_inputs_for_generation(self, input_ids, past_key_values=None,  attention_mask=None, inputs_embeds=None, **model_kwargs):
         input_shape = input_ids.shape
         # if model is used as a decoder in encoder-decoder model, the decoder attention mask is created on the fly
         if attention_mask is None:
             attention_mask = input_ids.new_ones(input_shape)
 
-        # cut decoder_input_ids if past is used
-        if past is not None:
-            input_ids = input_ids[:, -1:]
+        # # cut decoder_input_ids if past is used
+        # if past_key_values is not None:
+        #     input_ids = input_ids[:, -1:]
 
         return {
             "input_ids": input_ids,
+            "inputs_embeds": inputs_embeds,
             "attention_mask": attention_mask,
+            "past_key_values": past_key_values,
+            "adapter_input_parallelized": model_kwargs.pop("adapter_input_parallelized", False),
         }
 
     def add_classification_head(
         self,
         head_name,
-        multilabel=False,
         num_labels=2,
+        multilabel=False,
         layers=2,
         activation_function="tanh",
+        overwrite_ok=False,
         id2label=None,
-        use_pooler=False,
-        bias=True,
-        dropout_prob=None
     ):
+
 
         if multilabel:
             assert False, "Unimplemented"
@@ -139,7 +144,6 @@ class MambaAdapterModel(EmbeddingAdaptersWrapperMixin, ModelWithFlexibleHeadsAda
                 layers=layers,
                 activation_function=activation_function,
                 id2label=id2label,
-                use_pooler=use_pooler,
-                bias=bias,
-                dropout_prob=dropout_prob,
+                use_pooler=False,
+                overwrite_ok=overwrite_ok
             )

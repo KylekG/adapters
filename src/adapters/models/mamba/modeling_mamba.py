@@ -31,20 +31,24 @@ is_fast_path_available = all(
 class MambaMixerWithAdapters(MambaMixerAdapterMixin, MambaMixer):
     def forward(self, hidden_states, cache_params: Optional[MambaCache] = None):
         if is_fast_path_available and "cuda" in self.x_proj.weight.device.type:
-            return self.cuda_kernels_forward(hidden_states, cache_params)
-        return self.slow_forward(hidden_states, cache_params)
+            return self.cuda_kernels_forward(hidden_states=hidden_states, cache_params=cache_params)
+        return self.slow_forward(input_states=hidden_states, cache_params=cache_params)
 
 
 class MambaBlockWithAdapters(MambaBlockAdapterMixin, MambaBlock):
+
     def forward(self, hidden_states, cache_params: Optional[MambaCache] = None):
         residual = hidden_states
+
         hidden_states = self.norm(
             hidden_states.to(dtype=self.norm.weight.dtype)
         )
-        
+
         if self.residual_in_fp32:
             residual = residual.to(torch.float32)
 
-        hidden_states = residual + hidden_states
-        return hidden_states
-
+        hidden_states = self.mixer(
+            hidden_states=hidden_states, cache_params=cache_params)
+        # hidden_states = residual + hidden_states
+        # return hidden_states
+        return self.bottleneck_layer_forward(hidden_states, residual, None)

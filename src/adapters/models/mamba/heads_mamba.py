@@ -1,7 +1,8 @@
 from transformers.models.mamba.modeling_mamba import MambaSequenceClassificationOutput
-    
+
 from transformers.modeling_outputs import Seq2SeqModelOutput
 import torch
+from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from typing import Optional, Dict
@@ -33,11 +34,13 @@ class MambaSequenceClassificationHead(PredictionHead):
             "bias": bias,
             "dropout_prob": dropout_prob,
         }
+        # self.add_module(
+        #     "cls", nn.Linear(model.config.hidden_size, self.config["num_labels"]))
         self.build(model)
 
     def forward(self, outputs, cls_output=None, attention_mask=None, return_dict=False, **kwargs):
         if cls_output is None:
-            cls_output = self._get_cls_output(outputs, **kwargs)
+            cls_output = outputs[0][..., -1, :]
         logits = super().forward(cls_output)
         loss = None
         labels = kwargs.pop("labels", None)
@@ -47,9 +50,13 @@ class MambaSequenceClassificationHead(PredictionHead):
                 loss_fct = MSELoss()
                 loss = loss_fct(logits.view(-1), labels.view(-1))
             else:
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(
-                    logits.view(-1, self.config["num_labels"]), labels.view(-1))
+                loss_fct = BCEWithLogitsLoss(
+                    pos_weight=torch.ones([self.config["num_labels"]], device=logits.device))
+                logits_in = logits.view(-1,
+                                        self.config["num_labels"])
+                labels_in = labels.view(-1,
+                                        self.config["num_labels"]).float()
+                loss = loss_fct(logits_in, labels_in)
 
         if return_dict:
             if isinstance(outputs, Seq2SeqModelOutput):
